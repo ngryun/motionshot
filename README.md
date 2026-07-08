@@ -31,3 +31,9 @@
 
 정적 파일이므로 GitHub Pages, Netlify, Vercel 등에 `index.html`만 올리면 됩니다.
 모바일에서 쓰려면 HTTPS 주소로 배포한 뒤 폰 브라우저에서 접속하세요.
+
+배포 주소: https://ngryun.github.io/motionshot/
+
+## 만든 사람
+
+설악고등학교 교사 남궁연
