@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0f1117">
+<title>MotionShot — 움직임 궤적 사진 만들기</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --panel: #181c26;
+    --panel2: #1f2432;
+    --border: #2a3040;
+    --text: #e8eaf0;
+    --muted: #9aa3b5;
+    --accent: #4f8cff;
+    --accent2: #7c5cff;
+    --ok: #2ecc71;
+    --radius: 14px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Pretendard", "Noto Sans KR", "Malgun Gothic", sans-serif; }
+  body { min-height: 100vh; padding-bottom: env(safe-area-inset-bottom); }
+
+  .wrap { max-width: 720px; margin: 0 auto; padding: 16px 16px 48px; }
+
+  header { text-align: center; padding: 20px 0 6px; }
+  header h1 { font-size: 1.55rem; letter-spacing: -0.5px; }
+  header h1 .grad { background: linear-gradient(90deg, var(--accent), var(--accent2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  header p { color: var(--muted); font-size: 0.86rem; margin-top: 6px; line-height: 1.5; }
+
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; margin-top: 16px; }
+
+  /* 업로드 영역 */
+  #dropzone {
+    border: 2px dashed var(--border); border-radius: var(--radius);
+    padding: 36px 16px; text-align: center; cursor: pointer;
+    transition: border-color .15s, background .15s;
+  }
+  #dropzone.drag { border-color: var(--accent); background: rgba(79,140,255,.06); }
+  #dropzone .icon { font-size: 2.2rem; }
+  #dropzone .main { margin-top: 10px; font-weight: 600; }
+  #dropzone .sub { margin-top: 6px; color: var(--muted); font-size: 0.82rem; line-height: 1.5; }
+  #fileInput { display: none; }
+
+  video#vid { width: 100%; border-radius: 10px; background: #000; display: block; max-height: 320px; }
+
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .between { justify-content: space-between; }
+
+  .ctl { margin-top: 16px; }
+  .ctl label.name { display: flex; justify-content: space-between; font-size: 0.88rem; margin-bottom: 8px; }
+  .ctl label.name .val { color: var(--accent); font-variant-numeric: tabular-nums; font-weight: 600; }
+  .ctl .hint { color: var(--muted); font-size: 0.76rem; margin-top: 5px; line-height: 1.45; }
+
+  input[type=range] {
+    width: 100%; appearance: none; -webkit-appearance: none; height: 28px; background: transparent;
+  }
+  input[type=range]::-webkit-slider-runnable-track { height: 6px; border-radius: 3px; background: var(--panel2); border: 1px solid var(--border); }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 24px; height: 24px; border-radius: 50%;
+    background: var(--accent); margin-top: -10px; border: 3px solid #0f1117; box-shadow: 0 1px 4px rgba(0,0,0,.5);
+  }
+  input[type=range]::-moz-range-track { height: 6px; border-radius: 3px; background: var(--panel2); border: 1px solid var(--border); }
+  input[type=range]::-moz-range-thumb { width: 18px; height: 18px; border-radius: 50%; background: var(--accent); border: 3px solid #0f1117; }
+
+  .seg { display: flex; background: var(--panel2); border: 1px solid var(--border); border-radius: 10px; padding: 3px; }
+  .seg button {
+    flex: 1; border: 0; background: transparent; color: var(--muted); padding: 9px 4px;
+    border-radius: 8px; font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: background .12s, color .12s;
+  }
+  .seg button.on { background: var(--accent); color: #fff; }
+
+  .switchrow { display: flex; justify-content: space-between; align-items: center; }
+  .switch { position: relative; width: 46px; height: 26px; flex: none; }
+  .switch input { display: none; }
+  .switch .tr { position: absolute; inset: 0; border-radius: 13px; background: var(--panel2); border: 1px solid var(--border); transition: background .15s; cursor: pointer; }
+  .switch .tr::after { content: ""; position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border-radius: 50%; background: #cdd3e0; transition: transform .15s, background .15s; }
+  .switch input:checked + .tr { background: var(--accent); border-color: var(--accent); }
+  .switch input:checked + .tr::after { transform: translateX(20px); background: #fff; }
+
+  button.big {
+    width: 100%; margin-top: 18px; padding: 15px; border: 0; border-radius: 12px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2)); color: #fff;
+    font-size: 1.02rem; font-weight: 700; cursor: pointer; letter-spacing: -0.2px;
+  }
+  button.big:disabled { opacity: .45; cursor: default; }
+  button.ghost {
+    padding: 10px 14px; border-radius: 10px; border: 1px solid var(--border);
+    background: var(--panel2); color: var(--text); font-size: 0.86rem; font-weight: 600; cursor: pointer;
+  }
+
+  /* 진행 표시 */
+  #progressCard { display: none; }
+  .bar { height: 8px; border-radius: 4px; background: var(--panel2); border: 1px solid var(--border); overflow: hidden; margin-top: 10px; }
+  .bar > div { height: 100%; width: 0%; background: linear-gradient(90deg, var(--accent), var(--accent2)); transition: width .15s; }
+  #progressText { font-size: 0.86rem; color: var(--muted); }
+
+  /* 결과 */
+  #resultCard { display: none; }
+  #resultCanvas { width: 100%; border-radius: 10px; display: block; background: #000; }
+  .dlrow { display: flex; gap: 10px; margin-top: 12px; }
+  .dlrow button { flex: 1; }
+  #saveHint { display: none; margin-top: 10px; color: var(--muted); font-size: 0.8rem; text-align: center; line-height: 1.5; }
+
+  .sect-title { font-size: 0.95rem; font-weight: 700; margin-bottom: 4px; }
+  #videoCard, #settingsCard { display: none; }
+  #videoMeta { color: var(--muted); font-size: 0.8rem; margin-top: 8px; }
+
+  footer { text-align: center; color: var(--muted); font-size: 0.75rem; margin-top: 28px; line-height: 1.6; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>📸 <span class="grad">MotionShot</span></h1>
+    <p>동영상 속 움직이는 물체의 궤적을 한 장의 사진으로.<br>영상은 기기 밖으로 전송되지 않고 브라우저에서만 처리됩니다.</p>
+  </header>
+
+  <div class="card">
+    <div id="dropzone">
+      <div class="icon">🎬</div>
+      <div class="main">동영상 선택 또는 여기로 드래그</div>
+      <div class="sub">공 던지기, 점프, 스윙 등 <b>카메라를 고정하고 찍은</b> 영상이 가장 잘 됩니다.<br>삼각대가 없다면 벽이나 난간에 기대어 촬영해 보세요.</div>
+    </div>
+    <input type="file" id="fileInput" accept="video/*">
+  </div>
+
+  <div class="card" id="videoCard">
+    <div class="row between" style="margin-bottom:10px">
+      <div class="sect-title">원본 영상</div>
+      <button class="ghost" id="changeVideo">다른 영상 선택</button>
+    </div>
+    <video id="vid" muted playsinline controls></video>
+    <div id="videoMeta"></div>
+  </div>
+
+  <div class="card" id="settingsCard">
+    <div class="sect-title">합성 설정</div>
+
+    <div class="ctl">
+      <label class="name"><span>장면(프레임) 수</span><span class="val" id="frameCountVal">12</span></label>
+      <input type="range" id="frameCount" min="4" max="40" step="1" value="12">
+      <div class="hint">사진에 남길 잔상 개수입니다. 빠른 동작은 많게, 느린 동작은 적게.</div>
+    </div>
+
+    <div class="ctl">
+      <label class="name"><span>구간 선택</span><span class="val" id="trimVal"></span></label>
+      <input type="range" id="trimStart" min="0" max="100" step="0.5" value="0">
+      <input type="range" id="trimEnd" min="0" max="100" step="0.5" value="100">
+      <div class="hint">위: 시작 지점 / 아래: 끝 지점. 동작이 있는 구간만 잘라 쓰세요.</div>
+    </div>
+
+    <div class="ctl">
+      <label class="name"><span>합성 방식</span></label>
+      <div class="seg" id="modeSeg">
+        <button data-mode="auto" class="on">자동 (움직임 감지)</button>
+        <button data-mode="lighten">밝게 합성</button>
+        <button data-mode="darken">어둡게 합성</button>
+      </div>
+      <div class="hint">자동: 배경을 추정해 움직인 부분만 겹칩니다 (대부분의 경우 추천).<br>밝게: 어두운 배경 + 밝은 물체 / 어둡게: 밝은 배경 + 어두운 물체.</div>
+    </div>
+
+    <div class="ctl" id="sensCtl">
+      <label class="name"><span>감지 민감도</span><span class="val" id="sensVal">30</span></label>
+      <input type="range" id="sens" min="8" max="90" step="1" value="30">
+      <div class="hint">잔상이 안 나오면 낮추고, 배경 노이즈가 얼룩지면 높이세요.</div>
+    </div>
+
+    <div class="ctl">
+      <div class="switchrow">
+        <div>
+          <label class="name" style="margin-bottom:2px"><span>페이드 효과</span></label>
+          <div class="hint" style="margin-top:0">과거 잔상일수록 투명하게 표현합니다.</div>
+        </div>
+        <label class="switch"><input type="checkbox" id="fade"><span class="tr"></span></label>
+      </div>
+    </div>
+
+    <button class="big" id="goBtn">궤적 사진 만들기 ✨</button>
+  </div>
+
+  <div class="card" id="progressCard">
+    <div id="progressText">준비 중…</div>
+    <div class="bar"><div id="progressBar"></div></div>
+  </div>
+
+  <div class="card" id="resultCard">
+    <div class="sect-title" style="margin-bottom:10px">결과</div>
+    <canvas id="resultCanvas"></canvas>
+    <div class="dlrow">
+      <button class="ghost" id="dlPng">PNG 저장</button>
+      <button class="ghost" id="dlJpg">JPG 저장</button>
+    </div>
+    <div id="saveHint">저장이 안 되면 이미지를 <b>길게 눌러</b> "사진에 저장"을 선택하세요.</div>
+  </div>
+
+  <footer>MotionShot Web · 모든 처리는 이 기기 안에서만 이루어집니다.</footer>
+</div>
+
+<script>
+"use strict";
+
+const $ = id => document.getElementById(id);
+const dropzone = $("dropzone"), fileInput = $("fileInput");
+const vid = $("vid");
+const videoCard = $("videoCard"), settingsCard = $("settingsCard"), progressCard = $("progressCard"), resultCard = $("resultCard");
+const progressBar = $("progressBar"), progressText = $("progressText");
+const resultCanvas = $("resultCanvas");
+
+const state = {
+  file: null,
+  duration: 0,
+  vw: 0, vh: 0,
+  mode: "auto",
+  frames: null,       // [{data:Uint8ClampedArray, lum:Uint8Array}]
+  frameW: 0, frameH: 0,
+  bg: null,           // Uint8ClampedArray (RGBA)
+  cacheKey: "",       // 프레임 추출 결과가 유효한 설정 키
+  busy: false,
+  hasResult: false,
+};
+
+/* ---------- 파일 선택 ---------- */
+dropzone.addEventListener("click", () => fileInput.click());
+$("changeVideo").addEventListener("click", () => fileInput.click());
+["dragover","dragenter"].forEach(ev => dropzone.addEventListener(ev, e => { e.preventDefault(); dropzone.classList.add("drag"); }));
+["dragleave","drop"].forEach(ev => dropzone.addEventListener(ev, e => { e.preventDefault(); dropzone.classList.remove("drag"); }));
+dropzone.addEventListener("drop", e => {
+  const f = e.dataTransfer.files && e.dataTransfer.files[0];
+  if (f) loadVideo(f);
+});
+fileInput.addEventListener("change", () => {
+  if (fileInput.files[0]) loadVideo(fileInput.files[0]);
+});
+
+function fmtTime(s) {
+  const m = Math.floor(s / 60), ss = (s % 60).toFixed(1);
+  return m > 0 ? `${m}분 ${ss}초` : `${ss}초`;
+}
+
+async function loadVideo(file) {
+  if (!file.type.startsWith("video/") && !/\.(mp4|mov|webm|m4v|3gp)$/i.test(file.name)) {
+    alert("동영상 파일을 선택해 주세요.");
+    return;
+  }
+  state.file = file;
+  state.frames = null; state.bg = null; state.cacheKey = "";
+  state.hasResult = false;
+  resultCard.style.display = "none";
+
+  const url = URL.createObjectURL(file);
+  vid.src = url;
+  vid.muted = true;
+
+  await new Promise((res, rej) => {
+    vid.onloadedmetadata = res;
+    vid.onerror = () => rej(new Error("영상을 열 수 없습니다"));
+  }).catch(e => { alert("이 영상 형식은 브라우저에서 재생할 수 없습니다."); throw e; });
+
+  // iOS 등에서 디코더를 깨우기 위해 잠깐 재생-정지
+  try { await vid.play(); vid.pause(); } catch (_) {}
+
+  // 일부 녹화 webm은 duration이 Infinity로 나옴 → 끝으로 시킹해서 실제 길이 확보
+  if (!isFinite(vid.duration) || vid.duration <= 0) {
+    vid.currentTime = 1e7;
+    for (let i = 0; i < 40 && !(isFinite(vid.duration) && vid.duration > 0); i++) {
+      await new Promise(r => setTimeout(r, 100));
+    }
+  }
+  if (!isFinite(vid.duration) || vid.duration <= 0) {
+    alert("영상 길이를 읽을 수 없습니다. 다른 영상을 시도해 주세요.");
+    return;
+  }
+  vid.currentTime = 0;
+
+  state.duration = vid.duration;
+  state.vw = vid.videoWidth; state.vh = vid.videoHeight;
+  $("videoMeta").textContent = `${state.vw}×${state.vh} · ${fmtTime(state.duration)}`;
+
+  videoCard.style.display = "block";
+  settingsCard.style.display = "block";
+  updateTrimLabel();
+  settingsCard.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+/* ---------- 컨트롤 ---------- */
+const frameCountEl = $("frameCount"), sensEl = $("sens"), fadeEl = $("fade");
+const trimStartEl = $("trimStart"), trimEndEl = $("trimEnd");
+
+frameCountEl.addEventListener("input", () => { $("frameCountVal").textContent = frameCountEl.value; });
+sensEl.addEventListener("input", () => { $("sensVal").textContent = sensEl.value; scheduleRecompose(); });
+fadeEl.addEventListener("change", scheduleRecompose);
+
+function updateTrimLabel() {
+  let a = +trimStartEl.value, b = +trimEndEl.value;
+  if (a > b - 2) { a = Math.max(0, b - 2); trimStartEl.value = a; }
+  const d = state.duration || 0;
+  $("trimVal").textContent = d ? `${fmtTime(d * a / 100)} ~ ${fmtTime(d * b / 100)}` : "";
+}
+trimStartEl.addEventListener("input", () => {
+  if (+trimStartEl.value > +trimEndEl.value - 2) trimStartEl.value = +trimEndEl.value - 2;
+  updateTrimLabel();
+  if (state.duration) vid.currentTime = state.duration * trimStartEl.value / 100;
+});
+trimEndEl.addEventListener("input", () => {
+  if (+trimEndEl.value < +trimStartEl.value + 2) trimEndEl.value = +trimStartEl.value + 2;
+  updateTrimLabel();
+  if (state.duration) vid.currentTime = state.duration * trimEndEl.value / 100;
+});
+
+$("modeSeg").querySelectorAll("button").forEach(btn => {
+  btn.addEventListener("click", () => {
+    $("modeSeg").querySelectorAll("button").forEach(b => b.classList.remove("on"));
+    btn.classList.add("on");
+    state.mode = btn.dataset.mode;
+    $("sensCtl").style.display = state.mode === "auto" ? "block" : "none";
+    scheduleRecompose();
+  });
+});
+
+// 결과가 이미 있으면 설정 변경 시 자동으로 다시 합성 (프레임 추출은 재사용)
+let recomposeTimer = 0;
+function scheduleRecompose() {
+  if (!state.hasResult || state.busy) return;
+  clearTimeout(recomposeTimer);
+  recomposeTimer = setTimeout(() => run(true), 250);
+}
+
+/* ---------- 진행 표시 ---------- */
+function progress(text, frac) {
+  progressCard.style.display = "block";
+  progressText.textContent = text;
+  progressBar.style.width = Math.round(frac * 100) + "%";
+}
+function progressDone() { progressCard.style.display = "none"; }
+const tick = () => new Promise(r => setTimeout(r, 0));
+
+/* ---------- 프레임 추출 ---------- */
+function workingSize(frameCount) {
+  // 메모리 예산: 프레임 픽셀 총합 ≤ 약 3천만 px, 긴 변 최대 1280
+  const budget = 30e6 / frameCount;
+  const aspect = state.vw / state.vh;
+  let w = Math.min(state.vw, 1280, Math.round(Math.sqrt(budget * aspect)));
+  if (aspect < 1) w = Math.min(state.vw, Math.round(Math.min(1280, Math.sqrt(budget / aspect)) * aspect));
+  w = Math.max(2, w & ~1);
+  const h = Math.max(2, Math.round(w / aspect) & ~1);
+  return { w, h };
+}
+
+function seekTo(t) {
+  return new Promise(resolve => {
+    let done = false;
+    const finish = () => { if (!done) { done = true; resolve(); } };
+    if ("requestVideoFrameCallback" in vid) {
+      vid.requestVideoFrameCallback(() => finish());
+      vid.onseeked = () => setTimeout(finish, 60); // rVFC가 안 올 때 대비
+    } else {
+      vid.onseeked = () => requestAnimationFrame(() => setTimeout(finish, 30));
+    }
+    setTimeout(finish, 3000); // 최후 안전장치
+    vid.currentTime = t;
+  });
+}
+
+async function extractFrames(frameCount, t0, t1) {
+  const { w, h } = workingSize(frameCount);
+  const cv = document.createElement("canvas");
+  cv.width = w; cv.height = h;
+  const ctx = cv.getContext("2d", { willReadFrequently: true });
+
+  vid.pause();
+  const frames = [];
+  const span = Math.max(0.001, t1 - t0);
+  for (let i = 0; i < frameCount; i++) {
+    const t = Math.min(state.duration - 0.05, Math.max(0.01, t0 + span * (frameCount === 1 ? 0.5 : i / (frameCount - 1))));
+    await seekTo(t);
+    ctx.drawImage(vid, 0, 0, w, h);
+    const img = ctx.getImageData(0, 0, w, h);
+    const d = img.data;
+    const lum = new Uint8Array(w * h);
+    for (let p = 0, q = 0; q < lum.length; p += 4, q++) {
+      lum[q] = (d[p] * 77 + d[p + 1] * 150 + d[p + 2] * 29) >> 8;
+    }
+    frames.push({ data: d, lum });
+    progress(`프레임 추출 중… (${i + 1}/${frameCount})`, (i + 1) / frameCount * 0.45);
+  }
+  state.frames = frames;
+  state.frameW = w; state.frameH = h;
+  state.bg = null;
+}
+
+/* ---------- 배경 추정 (픽셀별 중앙값) ---------- */
+async function estimateBackground() {
+  const { frames, frameW: w, frameH: h } = state;
+  const n = frames.length;
+  const npx = w * h;
+  const bg = new Uint8ClampedArray(npx * 4);
+  const scratch = new Uint16Array(n);
+  const mid = n >> 1;
+  const CHUNK = 120000;
+
+  for (let start = 0; start < npx; start += CHUNK) {
+    const end = Math.min(npx, start + CHUNK);
+    for (let p = start; p < end; p++) {
+      // (밝기<<6 | 프레임번호) 를 삽입 정렬 → 중앙값 밝기를 가진 프레임 선택
+      for (let i = 0; i < n; i++) {
+        const v = (frames[i].lum[p] << 6) | i;
+        let j = i - 1;
+        while (j >= 0 && scratch[j] > v) { scratch[j + 1] = scratch[j]; j--; }
+        scratch[j + 1] = v;
+      }
+      const fi = scratch[mid] & 63;
+      const src = frames[fi].data, o = p * 4;
+      bg[o] = src[o]; bg[o + 1] = src[o + 1]; bg[o + 2] = src[o + 2]; bg[o + 3] = 255;
+    }
+    progress("배경 추정 중…", 0.45 + 0.25 * (end / npx));
+    await tick();
+  }
+  state.bg = bg;
+}
+
+/* ---------- 합성 ---------- */
+function boxBlurMask(mask, w, h, r) {
+  // 분리형 박스 블러 (in-place 아님)
+  const tmp = new Float32Array(mask.length);
+  const out = new Float32Array(mask.length);
+  const div = 2 * r + 1;
+  for (let y = 0; y < h; y++) {
+    const row = y * w;
+    let acc = 0;
+    for (let x = -r; x <= r; x++) acc += mask[row + Math.min(w - 1, Math.max(0, x))];
+    for (let x = 0; x < w; x++) {
+      tmp[row + x] = acc / div;
+      acc += mask[row + Math.min(w - 1, x + r + 1)] - mask[row + Math.max(0, x - r)];
+    }
+  }
+  for (let x = 0; x < w; x++) {
+    let acc = 0;
+    for (let y = -r; y <= r; y++) acc += tmp[Math.min(h - 1, Math.max(0, y)) * w + x];
+    for (let y = 0; y < h; y++) {
+      out[y * w + x] = acc / div;
+      acc += tmp[Math.min(h - 1, y + r + 1) * w + x] - tmp[Math.max(0, y - r) * w + x];
+    }
+  }
+  return out;
+}
+
+const smoothstep = (a, b, x) => {
+  const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
+  return t * t * (3 - 2 * t);
+};
+
+async function compose() {
+  const { frames, frameW: w, frameH: h, mode } = state;
+  const n = frames.length;
+  const npx = w * h;
+  const out = new Uint8ClampedArray(npx * 4);
+  const fade = fadeEl.checked;
+
+  if (mode === "lighten" || mode === "darken") {
+    const isMax = mode === "lighten";
+    out.set(frames[0].data);
+    for (let i = 1; i < n; i++) {
+      const d = frames[i].data;
+      for (let p = 0; p < out.length; p += 4) {
+        if (isMax) {
+          if (d[p] > out[p]) out[p] = d[p];
+          if (d[p + 1] > out[p + 1]) out[p + 1] = d[p + 1];
+          if (d[p + 2] > out[p + 2]) out[p + 2] = d[p + 2];
+        } else {
+          if (d[p] < out[p]) out[p] = d[p];
+          if (d[p + 1] < out[p + 1]) out[p + 1] = d[p + 1];
+          if (d[p + 2] < out[p + 2]) out[p + 2] = d[p + 2];
+        }
+        out[p + 3] = 255;
+      }
+      progress("합성 중…", 0.7 + 0.3 * (i / (n - 1)));
+      await tick();
+    }
+  } else {
+    if (!state.bg) await estimateBackground();
+    const bg = state.bg;
+    out.set(bg);
+    const thr = +sensEl.value;
+    const blurR = Math.max(1, Math.round(Math.min(w, h) / 360));
+    const mask = new Uint8Array(npx);
+
+    for (let i = 0; i < n; i++) {
+      const d = frames[i].data;
+      // 배경과의 차이로 이진 마스크 생성
+      for (let p = 0, q = 0; q < npx; p += 4, q++) {
+        const dr = Math.abs(d[p] - bg[p]);
+        const dg = Math.abs(d[p + 1] - bg[p + 1]);
+        const db = Math.abs(d[p + 2] - bg[p + 2]);
+        const diff = dr > dg ? (dr > db ? dr : db) : (dg > db ? dg : db);
+        mask[q] = diff > thr ? 255 : 0;
+      }
+      const soft = boxBlurMask(mask, w, h, blurR);
+      const frameAlpha = fade && n > 1 ? 0.3 + 0.7 * (i / (n - 1)) : 1;
+      for (let p = 0, q = 0; q < npx; p += 4, q++) {
+        // 낮은 값(고립 노이즈)은 버리고 가장자리는 부드럽게
+        let a = smoothstep(90, 200, soft[q]) * frameAlpha;
+        if (a <= 0.004) continue;
+        const ia = 1 - a;
+        out[p] = d[p] * a + out[p] * ia;
+        out[p + 1] = d[p + 1] * a + out[p + 1] * ia;
+        out[p + 2] = d[p + 2] * a + out[p + 2] * ia;
+        out[p + 3] = 255;
+      }
+      progress(`잔상 합성 중… (${i + 1}/${n})`, 0.7 + 0.3 * ((i + 1) / n));
+      await tick();
+    }
+  }
+
+  resultCanvas.width = w; resultCanvas.height = h;
+  resultCanvas.getContext("2d").putImageData(new ImageData(out, w, h), 0, 0);
+}
+
+/* ---------- 실행 ---------- */
+async function run(reuseFrames) {
+  if (state.busy || !state.file) return;
+  state.busy = true;
+  $("goBtn").disabled = true;
+  try {
+    const frameCount = +frameCountEl.value;
+    const t0 = state.duration * trimStartEl.value / 100;
+    const t1 = state.duration * trimEndEl.value / 100;
+    const key = `${frameCount}|${t0.toFixed(2)}|${t1.toFixed(2)}`;
+
+    if (!reuseFrames || state.cacheKey !== key || !state.frames) {
+      progress("프레임 추출 중…", 0);
+      await extractFrames(frameCount, t0, t1);
+      state.cacheKey = key;
+    }
+    await compose();
+    progressDone();
+    resultCard.style.display = "block";
+    state.hasResult = true;
+    if (!reuseFrames) resultCard.scrollIntoView({ behavior: "smooth", block: "start" });
+  } catch (e) {
+    console.error(e);
+    progressDone();
+    alert("처리 중 오류가 발생했습니다: " + (e && e.message || e));
+  } finally {
+    state.busy = false;
+    $("goBtn").disabled = false;
+  }
+}
+$("goBtn").addEventListener("click", () => run(false));
+
+/* ---------- 저장 ---------- */
+function download(type, ext, quality) {
+  resultCanvas.toBlob(blob => {
+    if (!blob) { $("saveHint").style.display = "block"; return; }
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    const d = new Date();
+    const pad = x => String(x).padStart(2, "0");
+    a.download = `motionshot_${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}.${ext}`;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 3000);
+    $("saveHint").style.display = "block";
+  }, type, quality);
+}
+$("dlPng").addEventListener("click", () => download("image/png", "png"));
+$("dlJpg").addEventListener("click", () => download("image/jpeg", "jpg", 0.93));
+</script>
+</body>
+</html>
